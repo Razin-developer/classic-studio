@@ -19,7 +19,7 @@ This catalog lists 50 product capabilities and their current status. “Implemen
 
 ## Vector editing and styling
 
-13. **[Implemented] Basic shape tools** — drag to create frames, rectangles, ellipses, lines, and text items; Shift constrains square and circular shapes.
+13. **[Implemented] Basic shape tools** — drag to create frames, rectangles, ellipses, regular five-sided polygons, lines, and text items; Shift constrains square, circular, and polygon bounds.
 14. **[Implemented] Fill and stroke controls** — edit solid colors and stroke width.
 15. **[Implemented] Opacity and corner radius** — adjust item opacity and rectangle rounding; the saved document foundation also includes a validated design-token library for future reusable values.
 16. **[Partial] Rotation** — rotate frames, rectangles, raster images, ellipses, and lines in the canvas with rotated selection bounds and hit checks; text rotation and rotated raster export remain pending.
@@ -59,9 +59,9 @@ This catalog lists 50 product capabilities and their current status. “Implemen
 
 ## Import and export
 
-41. **[Partial] SVG import** — import a limited subset of SVG shapes and presentation attributes; paths and advanced SVG features are unsupported.
-42. **[Partial] SVG export** — export basic document geometry, styling, and text as SVG.
-43. **[Partial] PNG export** — export the active page as a PNG with solid frames, rectangles, ellipses, and lines; text, images, paths, effects, rotation, and selected-region export remain pending.
+41. **[Partial] SVG import** — import a limited subset of SVG rectangles, ellipses, polygons, lines, text, and presentation attributes; paths and advanced SVG features are unsupported. Imported polygons are represented as Classic's regular five-sided polygon.
+42. **[Partial] SVG export** — export basic document geometry, including regular five-sided polygons, styling, and text as SVG.
+43. **[Partial] PNG export** — export the active page as a PNG with solid frames, rectangles, ellipses, regular five-sided polygons, and lines; text, images, paths, effects, rotation, and selected-region export remain pending.
 44. **[Planned] PDF export** — create shareable and print-ready PDF output.
 45. **[Planned] Open-format coverage** — add clearly scoped import/export support for common design assets and document formats.
 

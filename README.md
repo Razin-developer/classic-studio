@@ -16,7 +16,7 @@ The release profile enables full optimization and thin LTO.
 
 ## Keyboard controls
 
-- `V`, `F`, `R`, `O`, `L`, `T`: Move, Frame, Rectangle, Ellipse, Line, Text
+- `V`, `F`, `R`, `O`, `P`, `L`, `T`: Move, Frame, Rectangle, Ellipse, Polygon, Line, Text
 - `Ctrl/Cmd+Z`: Undo; `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y`: Redo
 - `Ctrl/Cmd+D`: Duplicate selection; `Delete` or `Backspace`: Delete selection
 - `Shift` + click: Add or remove an item from the selection; `Ctrl/Cmd+A`: Select all visible layers
@@ -30,7 +30,7 @@ The release profile enables full optimization and thin LTO.
 - Dockable Layers, Canvas, and Inspector workspaces, including detachable tabs
 - Phosphor icon font for the tool palette, shortcut hints, themed right-click actions, and hover tooltips
 - GPU-backed `wgpu` rendering through the native Rust UI stack
-- Select/move, frame, rectangle, ellipse, line, and text tools
+- Select/move, frame, rectangle, ellipse, regular five-sided polygon, line, and text tools
 - Starter landing-page canvas with editable layers
 - Canvas grid, scroll/keyboard zoom, Space-drag pan, multi-selection, drag-to-move, arrow-key nudges, fit-to-view, and resize handles
 - Position and size editing, fill, stroke, opacity, radius, rotation, and text editing
@@ -51,8 +51,8 @@ The release profile enables full optimization and thin LTO.
 - Accessibility check: compare a selected layer fill to an editable background and see WCAG normal/large-text contrast results
 - Windows tray icon with restore and quit actions; closing the window hides it in the tray
 - Versioned `.classic` JSON documents with validation and safer replacement saves
-- Basic SVG import from Open and SVG export from the inspector; paths, gradients, filters, and full SVG typography are unsupported
-- Active-page PNG export for solid frames, rectangles, ellipses, and lines; advanced layer types are skipped
+- Basic SVG import/export for rectangles, ellipses, regular polygons, lines, and text; paths, gradients, filters, and full SVG typography are unsupported
+- Active-page PNG export for solid frames, rectangles, ellipses, regular polygons, and lines; advanced layer types are skipped
 - Renderer-independent geometry, snapping, alignment, auto-layout, responsive constraints, and prototype graph models
 
 Cloud sharing, real-time collaboration, PDF export, nested-group editing, component variants, and full design-system workflows are not implemented. Frames, rectangles, raster images, ellipses, and lines rotate on the canvas; text rotation and rotated raster export remain scoped. Raster-image export, crop modes, filters, and vector-asset rendering are still scoped. Proprietary Figma project formats are intentionally unsupported.

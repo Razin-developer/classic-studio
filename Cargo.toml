@@ -12,6 +12,8 @@ members = [
     "crates/classic-guides",
     "crates/classic-tokens",
     "crates/classic-mcp",
+    "crates/classic-collab",
+    "crates/classic-extensions",
 ]
 
 [package]

@@ -85,6 +85,7 @@ enum Tool {
     Frame,
     Rectangle,
     Ellipse,
+    Polygon,
     Line,
     Text,
 }
@@ -96,6 +97,7 @@ impl Tool {
             Self::Frame => "Frame",
             Self::Rectangle => "Rectangle",
             Self::Ellipse => "Ellipse",
+            Self::Polygon => "Polygon",
             Self::Line => "Line",
             Self::Text => "Text",
         }
@@ -106,6 +108,7 @@ impl Tool {
             Self::Frame => "F",
             Self::Rectangle => "R",
             Self::Ellipse => "O",
+            Self::Polygon => "P",
             Self::Line => "L",
             Self::Text => "T",
         }
@@ -116,6 +119,7 @@ impl Tool {
             Self::Frame => Some(NodeKind::Frame),
             Self::Rectangle => Some(NodeKind::Rectangle),
             Self::Ellipse => Some(NodeKind::Ellipse),
+            Self::Polygon => Some(NodeKind::Polygon),
             Self::Line => Some(NodeKind::Line),
             Self::Text => Some(NodeKind::Text),
         }
@@ -126,6 +130,7 @@ impl Tool {
             Self::Frame => egui_phosphor::regular::FRAME_CORNERS,
             Self::Rectangle => egui_phosphor::regular::RECTANGLE,
             Self::Ellipse => egui_phosphor::regular::CIRCLE,
+            Self::Polygon => egui_phosphor::regular::PENTAGON,
             Self::Line => egui_phosphor::regular::LINE_SEGMENT,
             Self::Text => egui_phosphor::regular::TEXT_T,
         }
@@ -1060,6 +1065,7 @@ impl ClassicApp {
                     ToolShortcut::Frame => Tool::Frame,
                     ToolShortcut::Rectangle => Tool::Rectangle,
                     ToolShortcut::Ellipse => Tool::Ellipse,
+                    ToolShortcut::Polygon => Tool::Polygon,
                     ToolShortcut::Line => Tool::Line,
                     ToolShortcut::Text => Tool::Text,
                 };
@@ -1646,6 +1652,7 @@ impl ClassicApp {
                         NodeKind::Frame => "▣",
                         NodeKind::Rectangle => "□",
                         NodeKind::Ellipse => "○",
+                        NodeKind::Polygon => "⬠",
                         NodeKind::Image => "▧",
                         NodeKind::Line => "╱",
                         NodeKind::Text => "T",
@@ -2114,6 +2121,7 @@ impl ClassicApp {
                 Tool::Frame,
                 Tool::Rectangle,
                 Tool::Ellipse,
+                Tool::Polygon,
                 Tool::Line,
                 Tool::Text,
             ] {
@@ -2448,9 +2456,13 @@ impl ClassicApp {
                 Id::new(format!("node:{}", node.id)),
                 Sense::click_and_drag(),
             );
-            let pointer_is_on_node = response
-                .hover_pos()
-                .is_some_and(|point| point_in_rotated_rect(point, rect, node.rotation));
+            let pointer_is_on_node = response.hover_pos().is_some_and(|point| {
+                if node.kind == NodeKind::Polygon {
+                    point_in_regular_polygon(point, rect, node.rotation)
+                } else {
+                    point_in_rotated_rect(point, rect, node.rotation)
+                }
+            });
             let fill = with_opacity(parse_color(&node.fill), node.opacity);
             let stroke_color = with_opacity(parse_color(&node.stroke), node.opacity);
             match node.kind {
@@ -2571,6 +2583,20 @@ impl ClassicApp {
                                 Stroke::new(node.stroke_width * self.zoom, stroke_color),
                             );
                         }
+                    }
+                }
+                NodeKind::Polygon => {
+                    let points = regular_polygon_points(rect, node.rotation);
+                    painter.add(egui::Shape::convex_polygon(
+                        points.clone(),
+                        fill,
+                        Stroke::NONE,
+                    ));
+                    if node.stroke != "transparent" {
+                        painter.add(egui::Shape::closed_line(
+                            points,
+                            Stroke::new(node.stroke_width * self.zoom, stroke_color),
+                        ));
                     }
                 }
                 NodeKind::Line => {
@@ -2978,6 +3004,20 @@ impl ClassicApp {
                         );
                     }
                 }
+                NodeKind::Polygon => {
+                    let points = regular_polygon_points(rect, node.rotation);
+                    painter.add(egui::Shape::convex_polygon(
+                        points.clone(),
+                        fill,
+                        Stroke::NONE,
+                    ));
+                    if node.stroke != "transparent" {
+                        painter.add(egui::Shape::closed_line(
+                            points,
+                            Stroke::new(node.stroke_width.max(1.0) * scale, stroke),
+                        ));
+                    }
+                }
                 NodeKind::Line => {
                     painter.line_segment(
                         [rect.left_top(), rect.right_bottom()],
@@ -3040,6 +3080,7 @@ impl ClassicApp {
                 shortcut_row(ui, "Frame", "F");
                 shortcut_row(ui, "Rectangle", "R");
                 shortcut_row(ui, "Ellipse", "O");
+                shortcut_row(ui, "Polygon", "P");
                 shortcut_row(ui, "Line", "L");
                 shortcut_row(ui, "Text", "T");
                 ui.separator();
@@ -3255,6 +3296,42 @@ fn point_in_rotated_rect(point: Pos2, rect: Rect, degrees: f32) -> bool {
     rect.contains(unrotated)
 }
 
+fn regular_polygon_points(rect: Rect, degrees: f32) -> Vec<Pos2> {
+    const SIDES: usize = 5;
+    let radians = degrees.to_radians();
+    let (sin, cos) = radians.sin_cos();
+    let center = rect.center();
+    let radius_x = rect.width() * 0.5;
+    let radius_y = rect.height() * 0.5;
+    (0..SIDES)
+        .map(|index| {
+            let angle =
+                -std::f32::consts::FRAC_PI_2 + index as f32 * std::f32::consts::TAU / SIDES as f32;
+            let offset = Vec2::new(radius_x * angle.cos(), radius_y * angle.sin());
+            center
+                + Vec2::new(
+                    offset.x * cos - offset.y * sin,
+                    offset.x * sin + offset.y * cos,
+                )
+        })
+        .collect()
+}
+
+fn point_in_regular_polygon(point: Pos2, rect: Rect, degrees: f32) -> bool {
+    let points = regular_polygon_points(rect, degrees);
+    let mut inside = false;
+    for index in 0..points.len() {
+        let first = points[index];
+        let second = points[(index + 1) % points.len()];
+        if (first.y > point.y) != (second.y > point.y)
+            && point.x < (second.x - first.x) * (point.y - first.y) / (second.y - first.y) + first.x
+        {
+            inside = !inside;
+        }
+    }
+    inside
+}
+
 fn section(ui: &mut egui::Ui, title: &str) {
     ui.add_space(4.0);
     ui.separator();
@@ -3388,6 +3465,7 @@ fn node_kind_label(kind: &NodeKind) -> &'static str {
         NodeKind::Frame => "frame",
         NodeKind::Rectangle => "rectangle",
         NodeKind::Ellipse => "ellipse",
+        NodeKind::Polygon => "polygon",
         NodeKind::Image => "image",
         NodeKind::Text => "text",
         NodeKind::Line => "line",
@@ -3424,6 +3502,8 @@ fn css_for_node(node: &DesignNode) -> String {
             }
             if node.kind == NodeKind::Ellipse {
                 css.push_str("  border-radius: 50%;\n");
+            } else if node.kind == NodeKind::Polygon {
+                css.push_str("  clip-path: polygon(50% 0%, 97.6% 34.5%, 79.4% 90.5%, 20.6% 90.5%, 2.4% 34.5%);\n");
             } else if node.corner_radius > 0.0 {
                 css.push_str(&format!("  border-radius: {:.0}px;\n", node.corner_radius));
             }

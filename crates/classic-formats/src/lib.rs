@@ -290,6 +290,10 @@ fn write_svg_node(out: &mut String, n: &DesignNode, depth: usize) {
             n.width / 2.0,
             n.height / 2.0
         )),
+        NodeKind::Polygon => out.push_str(&format!(
+            "{pad}<polygon points=\"{}\"{common}/>\n",
+            polygon_points(n)
+        )),
         NodeKind::Line => out.push_str(&format!(
             "{pad}<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{common}/>\n",
             n.x,
@@ -322,6 +326,22 @@ fn write_svg_node(out: &mut String, n: &DesignNode, depth: usize) {
     }
 }
 
+fn polygon_points(node: &DesignNode) -> String {
+    const SIDES: usize = 5;
+    let cx = node.x + node.width * 0.5;
+    let cy = node.y + node.height * 0.5;
+    let rx = node.width * 0.5;
+    let ry = node.height * 0.5;
+    (0..SIDES)
+        .map(|index| {
+            let angle =
+                -std::f32::consts::FRAC_PI_2 + index as f32 * std::f32::consts::TAU / SIDES as f32;
+            format!("{},{}", cx + rx * angle.cos(), cy + ry * angle.sin())
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -331,7 +351,7 @@ fn xml_escape(s: &str) -> String {
 }
 
 /// Import a deliberately small SVG subset as a new one-page Classic document.
-/// Supports rect, ellipse, line, and text elements with basic geometry and
+/// Supports rect, ellipse, polygon, line, and text elements with basic geometry and
 /// inline presentation attributes. Other elements are ignored; paths, gradients,
 /// filters, CSS stylesheets, clipping, and full SVG text layout are unsupported.
 pub fn import_svg(
@@ -463,6 +483,7 @@ fn parse_svg_node(
     let kind = match tag {
         "rect" => NodeKind::Rectangle,
         "ellipse" | "circle" => NodeKind::Ellipse,
+        "polygon" => NodeKind::Polygon,
         "line" => NodeKind::Line,
         "text" => NodeKind::Text,
         _ => return None,
@@ -498,6 +519,7 @@ fn parse_svg_node(
             let y1 = get("y1", 0.0);
             (x1, y1, get("x2", x1) - x1, get("y2", y1) - y1)
         }
+        "polygon" => polygon_bounds(a.get("points")?)?,
         _ => (
             get("x", 0.0),
             get("y", 0.0),
@@ -542,6 +564,32 @@ fn parse_svg_node(
         node.rotation = parse_rotate(transform).unwrap_or(0.0);
     }
     Some(node)
+}
+
+fn polygon_bounds(points: &str) -> Option<(f32, f32, f32, f32)> {
+    let values = points
+        .split(|character: char| character.is_ascii_whitespace() || character == ',')
+        .filter(|value| !value.is_empty())
+        .filter_map(number)
+        .collect::<Vec<_>>();
+    if values.len() < 6 || values.len() % 2 != 0 {
+        return None;
+    }
+    let mut xs = values.iter().step_by(2).copied();
+    let mut ys = values.iter().skip(1).step_by(2).copied();
+    let first_x = xs.next()?;
+    let first_y = ys.next()?;
+    let (mut min_x, mut max_x) = (first_x, first_x);
+    let (mut min_y, mut max_y) = (first_y, first_y);
+    for x in xs {
+        min_x = min_x.min(x);
+        max_x = max_x.max(x);
+    }
+    for y in ys {
+        min_y = min_y.min(y);
+        max_y = max_y.max(y);
+    }
+    Some((min_x, min_y, max_x - min_x, max_y - min_y))
 }
 
 fn number(value: &str) -> Option<f32> {

@@ -622,6 +622,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "classic-collab"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "uuid",
+]
+
+[[package]]
 name = "classic-comments"
 version = "0.1.0"
 dependencies = [
@@ -649,6 +657,13 @@ dependencies = [
  "classic-tokens",
  "serde",
  "uuid",
+]
+
+[[package]]
+name = "classic-extensions"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

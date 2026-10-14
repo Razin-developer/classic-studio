@@ -8,7 +8,7 @@
 //!
 //! | Shortcut | Action |
 //! | --- | --- |
-//! | V / F / R / O / L / T | Select / Frame / Rectangle / Ellipse / Line / Text tool |
+//! | V / F / R / O / P / L / T | Select / Frame / Rectangle / Ellipse / Polygon / Line / Text tool |
 //! | Ctrl/Command+Z | Undo |
 //! | Ctrl/Command+Shift+Z or Ctrl/Command+Y | Redo |
 //! | Ctrl/Command+A | Select all layers |
@@ -29,6 +29,7 @@ pub enum ToolShortcut {
     Frame,
     Rectangle,
     Ellipse,
+    Polygon,
     Line,
     Text,
 }
@@ -130,6 +131,7 @@ pub fn collect(ctx: &egui::Context) -> Vec<ShortcutAction> {
         (Key::F, ToolShortcut::Frame),
         (Key::R, ToolShortcut::Rectangle),
         (Key::O, ToolShortcut::Ellipse),
+        (Key::P, ToolShortcut::Polygon),
         (Key::L, ToolShortcut::Line),
         (Key::T, ToolShortcut::Text),
     ] {

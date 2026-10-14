@@ -162,6 +162,7 @@ fn render_node(image: &mut RgbaImage, node: &DesignNode, options: RasterOptions)
             draw_rounded_rect(image, node, fill, stroke, options);
         }
         NodeKind::Ellipse => draw_ellipse(image, node, fill, stroke, options),
+        NodeKind::Polygon => draw_polygon(image, node, fill, stroke, options),
         NodeKind::Line => {
             if let Some(color) = stroke.or(fill) {
                 draw_line(image, node, color, options);
@@ -169,6 +170,58 @@ fn render_node(image: &mut RgbaImage, node: &DesignNode, options: RasterOptions)
         }
         NodeKind::Text => {}
     }
+}
+
+fn draw_polygon(
+    image: &mut RgbaImage,
+    node: &DesignNode,
+    fill: Option<Rgba<u8>>,
+    stroke: Option<Rgba<u8>>,
+    options: RasterOptions,
+) {
+    const SIDES: usize = 5;
+    let (left, top, right, bottom) = bounds(node, options, node.stroke_width.max(0.0) * 0.5);
+    let cx = (left + right) * 0.5;
+    let cy = (top + bottom) * 0.5;
+    let rx = (right - left) * 0.5;
+    let ry = (bottom - top) * 0.5;
+    if rx <= 0.0 || ry <= 0.0 {
+        return;
+    }
+    let points = (0..SIDES)
+        .map(|index| {
+            let angle =
+                -std::f32::consts::FRAC_PI_2 + index as f32 * std::f32::consts::TAU / SIDES as f32;
+            (cx + rx * angle.cos(), cy + ry * angle.sin())
+        })
+        .collect::<Vec<_>>();
+    let half_stroke = node.stroke_width.max(0.0) * options.scale * 0.5;
+    visit_bounds(image, left, top, right, bottom, |image, x, y| {
+        let px = x as f32 + 0.5;
+        let py = y as f32 + 0.5;
+        let inside = point_in_polygon(px, py, &points);
+        let edge_distance = points
+            .iter()
+            .enumerate()
+            .map(|(index, &(x1, y1))| {
+                let (x2, y2) = points[(index + 1) % points.len()];
+                point_segment_distance(px, py, x1, y1, x2, y2)
+            })
+            .fold(f32::INFINITY, f32::min);
+        if edge_distance <= half_stroke {
+            if let Some(color) = stroke {
+                blend_pixel(image, x, y, color);
+            } else if inside {
+                if let Some(color) = fill {
+                    blend_pixel(image, x, y, color);
+                }
+            }
+        } else if inside {
+            if let Some(color) = fill {
+                blend_pixel(image, x, y, color);
+            }
+        }
+    });
 }
 
 fn draw_rounded_rect(
@@ -331,6 +384,18 @@ fn point_segment_distance(px: f32, py: f32, x1: f32, y1: f32, x2: f32, y2: f32) 
     }
     let t = (((px - x1) * dx + (py - y1) * dy) / length_squared).clamp(0.0, 1.0);
     (px - (x1 + t * dx)).hypot(py - (y1 + t * dy))
+}
+
+fn point_in_polygon(px: f32, py: f32, points: &[(f32, f32)]) -> bool {
+    let mut inside = false;
+    for index in 0..points.len() {
+        let (x1, y1) = points[index];
+        let (x2, y2) = points[(index + 1) % points.len()];
+        if (y1 > py) != (y2 > py) && px < (x2 - x1) * (py - y1) / (y2 - y1) + x1 {
+            inside = !inside;
+        }
+    }
+    inside
 }
 
 fn parse_color(value: &str) -> Option<Rgba<u8>> {

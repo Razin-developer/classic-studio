@@ -70,6 +70,7 @@ pub enum NodeKind {
     Frame,
     Rectangle,
     Ellipse,
+    Polygon,
     Image,
     Text,
     Line,
@@ -351,6 +352,7 @@ impl DesignNode {
             NodeKind::Frame => ("Frame", 420.0, 300.0, "#ffffff", "#d7d9df", 0.0, None),
             NodeKind::Rectangle => ("Rectangle", 150.0, 110.0, "#c8b6ff", "#7557c8", 12.0, None),
             NodeKind::Ellipse => ("Ellipse", 110.0, 110.0, "#ffbe98", "#de7951", 0.0, None),
+            NodeKind::Polygon => ("Polygon", 130.0, 130.0, "#8cd7c7", "#2b867b", 0.0, None),
             NodeKind::Image => ("Image", 320.0, 220.0, "#d8dde8", "#777e90", 8.0, None),
             NodeKind::Text => (
                 "Text",

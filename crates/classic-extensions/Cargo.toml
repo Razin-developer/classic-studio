@@ -1,0 +1,14 @@
+[package]
+name = "classic-extensions"
+version = "0.1.0"
+edition = "2024"
+description = "Secure, serializable extension manifest validation for Classic Studio"
+license = "MIT"
+publish = false
+
+[lib]
+name = "classic_extensions"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
