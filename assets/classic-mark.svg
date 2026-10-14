@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Classic mark</title>
+  <desc id="desc">An open, layered canvas frame forming a C around a bright anchor point.</desc>
+  <defs>
+    <linearGradient id="frame" x1="18" y1="16" x2="111" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset=".52" stop-color="#6D7CFF"/>
+      <stop offset="1" stop-color="#42D6C8"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="40" y1="34" x2="91" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDE5FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="34" fill="#151827"/>
+  <path d="M87 24H48a25 25 0 0 0-25 25v30a25 25 0 0 0 25 25h39" stroke="url(#frame)" stroke-width="11" stroke-linecap="round"/>
+  <path d="M83 43H54a13 13 0 0 0-13 13v16a13 13 0 0 0 13 13h29" stroke="#FFFFFF" stroke-opacity=".23" stroke-width="2"/>
+  <path d="M72 47h19v19H72z" fill="url(#tile)"/>
+  <path d="M72 47v8a3 3 0 0 0 3 3h8" stroke="#B8C3F8" stroke-width="2"/>
+  <circle cx="91" cy="66" r="5" fill="#FFD166"/>
+  <path d="M91 56v3M91 73v3M81 66h3M98 66h3" stroke="#FFD166" stroke-width="2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,13 @@
+[package]
+name = "classic-tokens"
+version = "0.1.0"
+edition = "2024"
+description = "Renderer-independent serializable design tokens for Classic Studio"
+license = "MIT"
+
+[lib]
+name = "classic_tokens"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

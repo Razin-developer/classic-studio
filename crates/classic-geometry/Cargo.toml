@@ -1,0 +1,12 @@
+[package]
+name = "classic-geometry"
+version = "0.1.0"
+edition = "2024"
+description = "2D canvas geometry, snapping, alignment, and distribution primitives for Classic Studio"
+license = "MIT"
+
+[lib]
+name = "classic_geometry"
+path = "src/lib.rs"
+
+[dependencies]

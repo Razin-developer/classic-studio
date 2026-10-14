@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/classic-core",
+    "crates/classic-geometry",
+    "crates/classic-layout",
+    "crates/classic-formats",
+    "crates/classic-raster",
+    "crates/classic-comments",
+    "crates/classic-components",
+    "crates/classic-assets",
+    "crates/classic-guides",
+    "crates/classic-tokens",
+]
+
+[package]
+name = "classic-studio"
+version = "0.1.0"
+edition = "2024"
+description = "Independent native Rust canvas design studio"
+license = "MIT"
+
+[dependencies]
+classic-assets = { path = "crates/classic-assets" }
+classic-comments = { path = "crates/classic-comments" }
+classic-components = { path = "crates/classic-components" }
+classic-core = { path = "crates/classic-core" }
+classic-geometry = { path = "crates/classic-geometry" }
+classic-formats = { path = "crates/classic-formats" }
+classic-raster = { path = "crates/classic-raster" }
+classic-guides = { path = "crates/classic-guides" }
+classic-layout = { path = "crates/classic-layout" }
+eframe = "0.36.2"
+egui_dock = "0.21.1"
+egui-phosphor = "0.14.0"
+image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "webp"] }
+rfd = { version = "0.17.2", default-features = false, features = ["common-controls-v6"] }
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+tray-icon = { version = "0.26.1", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,47 @@
+name: Build desktop releases
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            label: Windows
+            artifact: classic-studio.exe
+          - runner: ubuntu-latest
+            label: Linux
+            artifact: classic-studio
+          - runner: macos-latest
+            label: macOS
+            artifact: classic-studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build optimized desktop application
+        run: cargo build --release --locked
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir -p release
+          cp "target/release/${{ matrix.artifact }}" "release/classic-studio-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: classic-studio-${{ matrix.label }}
+          path: release/*
+      - name: Publish GitHub release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*

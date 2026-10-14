@@ -1,0 +1,9 @@
+target/
+*.classic
+*.classic-tmp
+.env
+.env.*
+!.env.example
+backend/.wrangler/
+backend/node_modules/
+site/dist/

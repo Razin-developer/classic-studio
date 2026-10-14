@@ -1,0 +1,9 @@
+[package]
+name = "classic-layout"
+version = "0.1.0"
+edition = "2024"
+description = "Layout, resizing constraints, and prototype interaction models for Classic"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

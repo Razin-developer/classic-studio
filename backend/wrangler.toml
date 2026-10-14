@@ -1,0 +1,9 @@
+name = "classic-studio-api"
+main = "src/worker.ts"
+compatibility_date = "2026-10-14"
+workers_dev = true
+
+# Do not put secrets here. Configure JWT_SECRET, CORS_ORIGINS, and API_PROXY_URL
+# with `wrangler secret put ...`. A Worker cannot open an Atlas TCP connection.
+[vars]
+APP_ENV = "production"

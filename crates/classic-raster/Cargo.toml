@@ -1,0 +1,10 @@
+[package]
+name = "classic-raster"
+version = "0.1.0"
+edition = "2024"
+description = "CPU PNG raster export for the Classic design document model"
+license = "MIT"
+
+[dependencies]
+classic-core = { path = "../classic-core" }
+image = { version = "0.25", default-features = false, features = ["png"] }

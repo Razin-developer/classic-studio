@@ -1,0 +1,14 @@
+[package]
+name = "classic-assets"
+version = "0.1.0"
+edition = "2024"
+description = "Local, serializable asset catalog models for Classic Studio"
+license = "MIT"
+
+[lib]
+name = "classic_assets"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
