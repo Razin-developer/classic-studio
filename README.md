@@ -55,7 +55,7 @@ The release profile enables full optimization and thin LTO.
 - Active-page PNG export for solid frames, rectangles, ellipses, and lines; advanced layer types are skipped
 - Renderer-independent geometry, snapping, alignment, auto-layout, responsive constraints, and prototype graph models
 
-Cloud sharing, real-time collaboration, PDF export, nested-group editing, component variants, and full design-system workflows are not implemented. Rotation is stored in the document and editable in the inspector, but canvas painting and hit testing currently remain axis-aligned. Raster-image export, crop modes, filters, and vector-asset rendering are still scoped. Proprietary Figma project formats are intentionally unsupported.
+Cloud sharing, real-time collaboration, PDF export, nested-group editing, component variants, and full design-system workflows are not implemented. Frames, rectangles, raster images, ellipses, and lines rotate on the canvas; text rotation and rotated raster export remain scoped. Raster-image export, crop modes, filters, and vector-asset rendering are still scoped. Proprietary Figma project formats are intentionally unsupported.
 
 ## Structure
 

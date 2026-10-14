@@ -2441,11 +2441,16 @@ impl ClassicApp {
                 continue;
             }
             let rect = self.node_at_screen(&node, canvas);
+            let corners = rotated_corners(rect, node.rotation);
+            let interaction_rect = rotated_bounds(&corners);
             let response = ui.interact(
-                rect,
+                interaction_rect,
                 Id::new(format!("node:{}", node.id)),
                 Sense::click_and_drag(),
             );
+            let pointer_is_on_node = response
+                .hover_pos()
+                .is_some_and(|point| point_in_rotated_rect(point, rect, node.rotation));
             let fill = with_opacity(parse_color(&node.fill), node.opacity);
             let stroke_color = with_opacity(parse_color(&node.stroke), node.opacity);
             match node.kind {
@@ -2453,30 +2458,68 @@ impl ClassicApp {
                     let radius = CornerRadius::same(
                         (node.corner_radius * self.zoom).clamp(0.0, 255.0) as u8,
                     );
-                    painter.rect_filled(rect, radius, fill);
+                    if node.rotation.abs() > f32::EPSILON {
+                        painter.add(egui::Shape::convex_polygon(
+                            corners.to_vec(),
+                            fill,
+                            Stroke::NONE,
+                        ));
+                    } else {
+                        painter.rect_filled(rect, radius, fill);
+                    }
                     if node.kind == NodeKind::Image {
                         let texture = node
                             .asset_id
                             .as_deref()
                             .and_then(|asset_id| self.texture_for_asset(ui.ctx(), asset_id));
                         if let Some(texture) = texture {
-                            painter.image(
-                                texture.id(),
-                                rect,
-                                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                                Color32::from_white_alpha(
-                                    (node.opacity.clamp(0.0, 1.0) * 255.0) as u8,
-                                ),
+                            let tint = Color32::from_white_alpha(
+                                (node.opacity.clamp(0.0, 1.0) * 255.0) as u8,
                             );
+                            if node.rotation.abs() > f32::EPSILON {
+                                let mut mesh = egui::Mesh::with_texture(texture.id());
+                                mesh.vertices = vec![
+                                    egui::epaint::Vertex {
+                                        pos: corners[0],
+                                        uv: Pos2::new(0.0, 0.0),
+                                        color: tint,
+                                    },
+                                    egui::epaint::Vertex {
+                                        pos: corners[1],
+                                        uv: Pos2::new(1.0, 0.0),
+                                        color: tint,
+                                    },
+                                    egui::epaint::Vertex {
+                                        pos: corners[2],
+                                        uv: Pos2::new(1.0, 1.0),
+                                        color: tint,
+                                    },
+                                    egui::epaint::Vertex {
+                                        pos: corners[3],
+                                        uv: Pos2::new(0.0, 1.0),
+                                        color: tint,
+                                    },
+                                ];
+                                mesh.add_triangle(0, 1, 2);
+                                mesh.add_triangle(0, 2, 3);
+                                painter.add(egui::Shape::mesh(mesh));
+                            } else {
+                                painter.image(
+                                    texture.id(),
+                                    rect,
+                                    Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                                    tint,
+                                );
+                            }
                         }
                     }
                     if node.stroke != "transparent" {
-                        painter.rect_stroke(
-                            rect,
-                            radius,
-                            Stroke::new(node.stroke_width * self.zoom, stroke_color),
-                            StrokeKind::Inside,
-                        );
+                        let stroke = Stroke::new(node.stroke_width * self.zoom, stroke_color);
+                        if node.rotation.abs() > f32::EPSILON {
+                            painter.add(egui::Shape::closed_line(corners.to_vec(), stroke));
+                        } else {
+                            painter.rect_stroke(rect, radius, stroke, StrokeKind::Inside);
+                        }
                     }
                     if node.kind == NodeKind::Frame {
                         painter.text(
@@ -2504,22 +2547,35 @@ impl ClassicApp {
                     }
                 }
                 NodeKind::Ellipse => {
-                    painter.circle_filled(
-                        rect.center(),
-                        rect.width().min(rect.height()) / 2.0,
-                        fill,
-                    );
-                    if node.stroke != "transparent" {
-                        painter.circle_stroke(
-                            rect.center(),
-                            rect.width().min(rect.height()) / 2.0,
-                            Stroke::new(node.stroke_width * self.zoom, stroke_color),
-                        );
+                    if node.rotation.abs() > f32::EPSILON
+                        || (rect.width() - rect.height()).abs() > f32::EPSILON
+                    {
+                        let points = rotated_ellipse_points(rect, node.rotation);
+                        painter.add(egui::Shape::convex_polygon(
+                            points.clone(),
+                            fill,
+                            Stroke::NONE,
+                        ));
+                        if node.stroke != "transparent" {
+                            painter.add(egui::Shape::closed_line(
+                                points,
+                                Stroke::new(node.stroke_width * self.zoom, stroke_color),
+                            ));
+                        }
+                    } else {
+                        painter.circle_filled(rect.center(), rect.width() * 0.5, fill);
+                        if node.stroke != "transparent" {
+                            painter.circle_stroke(
+                                rect.center(),
+                                rect.width() * 0.5,
+                                Stroke::new(node.stroke_width * self.zoom, stroke_color),
+                            );
+                        }
                     }
                 }
                 NodeKind::Line => {
                     painter.line_segment(
-                        [rect.left_top(), rect.right_bottom()],
+                        [corners[0], corners[2]],
                         Stroke::new(node.stroke_width.max(1.0) * self.zoom, stroke_color),
                     );
                 }
@@ -2560,14 +2616,14 @@ impl ClassicApp {
                     Color32::WHITE,
                 );
             }
-            if response.hovered() {
+            if response.hovered() && pointer_is_on_node {
                 ui.ctx().set_cursor_icon(if node.locked {
                     egui::CursorIcon::NotAllowed
                 } else {
                     egui::CursorIcon::Grab
                 });
             }
-            if response.clicked() {
+            if response.clicked() && pointer_is_on_node {
                 if ui.input(|input| input.modifiers.shift) {
                     self.toggle_selection(node.id.clone());
                 } else {
@@ -2695,17 +2751,26 @@ impl ClassicApp {
                 self.snap_guides.clear();
             }
             if self.is_selected(&node.id) {
-                painter.rect_stroke(
-                    rect.expand(3.0),
-                    1.0,
-                    Stroke::new(1.2, PURPLE),
-                    StrokeKind::Outside,
-                );
-                painter.circle_filled(rect.right_bottom() + Vec2::splat(3.0), 4.0, Color32::WHITE);
-                let handle = Rect::from_center_size(
-                    rect.right_bottom() + Vec2::splat(3.0),
-                    Vec2::splat(12.0),
-                );
+                if node.rotation.abs() > f32::EPSILON {
+                    painter.add(egui::Shape::closed_line(
+                        corners.iter().map(|point| *point).collect(),
+                        Stroke::new(1.2, PURPLE),
+                    ));
+                } else {
+                    painter.rect_stroke(
+                        rect.expand(3.0),
+                        1.0,
+                        Stroke::new(1.2, PURPLE),
+                        StrokeKind::Outside,
+                    );
+                }
+                let resize_anchor = if node.rotation.abs() > f32::EPSILON {
+                    corners[2]
+                } else {
+                    rect.right_bottom() + Vec2::splat(3.0)
+                };
+                painter.circle_filled(resize_anchor, 4.0, Color32::WHITE);
+                let handle = Rect::from_center_size(resize_anchor, Vec2::splat(12.0));
                 let resize = ui.interact(
                     handle,
                     Id::new(format!("resize:{}", node.id)),
@@ -3129,6 +3194,65 @@ impl eframe::App for ClassicApp {
             });
         });
     }
+}
+
+fn rotated_corners(rect: Rect, degrees: f32) -> [Pos2; 4] {
+    let radians = degrees.to_radians();
+    let (sin, cos) = radians.sin_cos();
+    let center = rect.center();
+    let rotate = |point: Pos2| {
+        let offset = point - center;
+        center
+            + Vec2::new(
+                offset.x * cos - offset.y * sin,
+                offset.x * sin + offset.y * cos,
+            )
+    };
+    [
+        rotate(rect.left_top()),
+        rotate(rect.right_top()),
+        rotate(rect.right_bottom()),
+        rotate(rect.left_bottom()),
+    ]
+}
+
+fn rotated_bounds(corners: &[Pos2; 4]) -> Rect {
+    let mut bounds = Rect::NOTHING;
+    for point in corners {
+        bounds.extend_with(*point);
+    }
+    bounds
+}
+
+fn rotated_ellipse_points(rect: Rect, degrees: f32) -> Vec<Pos2> {
+    let radians = degrees.to_radians();
+    let (sin, cos) = radians.sin_cos();
+    let center = rect.center();
+    let radius_x = rect.width() * 0.5;
+    let radius_y = rect.height() * 0.5;
+    (0..32)
+        .map(|index| {
+            let angle = index as f32 / 32.0 * std::f32::consts::TAU;
+            let offset = Vec2::new(radius_x * angle.cos(), radius_y * angle.sin());
+            center
+                + Vec2::new(
+                    offset.x * cos - offset.y * sin,
+                    offset.x * sin + offset.y * cos,
+                )
+        })
+        .collect()
+}
+
+fn point_in_rotated_rect(point: Pos2, rect: Rect, degrees: f32) -> bool {
+    let radians = (-degrees).to_radians();
+    let (sin, cos) = radians.sin_cos();
+    let offset = point - rect.center();
+    let unrotated = rect.center()
+        + Vec2::new(
+            offset.x * cos - offset.y * sin,
+            offset.x * sin + offset.y * cos,
+        );
+    rect.contains(unrotated)
 }
 
 fn section(ui: &mut egui::Ui, title: &str) {

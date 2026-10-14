@@ -22,7 +22,7 @@ This catalog lists 50 product capabilities and their current status. “Implemen
 13. **[Implemented] Basic shape tools** — drag to create frames, rectangles, ellipses, lines, and text items; Shift constrains square and circular shapes.
 14. **[Implemented] Fill and stroke controls** — edit solid colors and stroke width.
 15. **[Implemented] Opacity and corner radius** — adjust item opacity and rectangle rounding; the saved document foundation also includes a validated design-token library for future reusable values.
-16. **[Partial] Rotation** — store and edit rotation, but canvas drawing and hit testing remain axis-aligned.
+16. **[Partial] Rotation** — rotate frames, rectangles, raster images, ellipses, and lines in the canvas with rotated selection bounds and hit checks; text rotation and rotated raster export remain pending.
 17. **[Partial] Text editing** — edit simple text content and color; advanced typography and layout are not supported.
 18. **[Planned] Pen and Bézier editing** — draw and edit vector paths with nodes and handles.
 19. **[Planned] Boolean shape operations** — combine, subtract, intersect, and exclude vector shapes.
