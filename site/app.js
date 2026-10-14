@@ -9,7 +9,7 @@
     });
   }
   document.querySelectorAll('[data-year]').forEach((item) => { item.textContent = new Date().getFullYear(); });
-  // Set window.CLASSIC_GITHUB_URL before this script to point every source link at the public repository.
-  const source = window.CLASSIC_GITHUB_URL;
+  // A custom deployment may override this before the script runs.
+  const source = window.CLASSIC_GITHUB_URL || 'https://github.com/Razin-developer/classic-studio';
   if (source) document.querySelectorAll('[data-github-link]').forEach((link) => { link.href = source; });
 })();
