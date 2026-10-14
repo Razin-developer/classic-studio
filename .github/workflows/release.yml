@@ -19,23 +19,35 @@ jobs:
         include:
           - runner: windows-latest
             label: Windows
-            artifact: classic-studio.exe
+            binary: classic-studio.exe
+            package: classic-studio-windows-x86_64.exe
+            cargo_args: ""
           - runner: ubuntu-latest
             label: Linux
-            artifact: classic-studio
+            binary: classic-studio
+            package: classic-studio-linux-x86_64
+            # rfd disables its default Linux backend in Cargo.toml. The portal
+            # backend is desktop-environment independent and needs no GTK SDK.
+            cargo_args: --features rfd/xdg-portal
           - runner: macos-latest
             label: macOS
-            artifact: classic-studio
+            binary: classic-studio
+            package: classic-studio-macos
+            cargo_args: ""
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Build optimized desktop application
-        run: cargo build --release --locked
+        shell: bash
+        run: cargo build --release --locked ${{ matrix.cargo_args }}
       - name: Package binary
         shell: bash
         run: |
           mkdir -p release
-          cp "target/release/${{ matrix.artifact }}" "release/classic-studio-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}"
+          cp "target/release/${{ matrix.binary }}" "release/${{ matrix.package }}"
+          if [[ "${{ matrix.binary }}" != *.exe ]]; then
+            chmod +x "release/${{ matrix.package }}"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: classic-studio-${{ matrix.label }}

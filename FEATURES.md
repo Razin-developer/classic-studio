@@ -36,7 +36,7 @@ This catalog lists 50 product capabilities and their current status. “Implemen
 24. **[Planned] Nested frames and groups** — create and edit hierarchical containers in the canvas and layer tree.
 25. **[Partial] Reusable components** — create a saved local component definition from a selected layer and place linked instances through the Components menu; editing definitions and instance overrides are pending.
 26. **[Foundation] Component variants** — the persisted component model stores variant axes and resolves named variants; editor controls are pending.
-27. **[Partial] Assets catalog and panel** — import/remove local asset references with metadata through the Assets tab or operating-system file drag/drop, place raster/vector assets as canvas image layers, decode PNG/JPEG/GIF/BMP/WebP assets to cached GPU textures, use a right-click remove action, and retain metadata in `.classic` documents; thumbnails, crop modes, filters, and vector rendering are pending.
+27. **[Partial] Assets catalog and panel** — import/remove local assets through the Assets tab or operating-system file drag/drop, embed bytes with SHA-256 integrity metadata inside `.classic` documents, place raster/vector assets as canvas image layers, decode PNG/JPEG/GIF/BMP/WebP assets to cached GPU textures, and use a right-click remove action; thumbnails, crop modes, filters, and vector rendering are pending.
 
 ## Prototyping
 

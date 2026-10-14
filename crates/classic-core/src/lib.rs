@@ -1,4 +1,4 @@
-use classic_assets::AssetCatalog;
+use classic_assets::{AssetCatalog, AssetId};
 use classic_comments::CommentStore;
 use classic_components::ComponentLibrary;
 use classic_guides::GuideStore;
@@ -159,6 +159,15 @@ impl DesignDocument {
             .find(|page| page.id == self.active_page_id)
     }
 
+    /// Returns self-contained bytes for a document asset when the asset was
+    /// saved inside this `.classic` document. Linked assets return `None` and
+    /// remain the responsibility of the application-level asset resolver.
+    pub fn embedded_asset_bytes(&self, asset_id: &str) -> Option<&[u8]> {
+        self.assets
+            .get(&AssetId::from(asset_id))
+            .and_then(|asset| asset.embedded_bytes())
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != 1 {
             return Err(format!(
@@ -175,7 +184,7 @@ impl DesignDocument {
             if !page_ids.insert(&page.id) {
                 return Err(format!("Duplicate page id: {}", page.id));
             }
-            validate_nodes(&page.nodes, &mut node_ids)?;
+            validate_nodes(&page.nodes, &mut node_ids, &self.assets)?;
         }
         self.guides
             .validate()
@@ -302,6 +311,7 @@ impl DesignDocument {
 fn validate_nodes(
     nodes: &[DesignNode],
     ids: &mut std::collections::HashSet<String>,
+    assets: &AssetCatalog,
 ) -> Result<(), String> {
     for node in nodes {
         if !ids.insert(node.id.clone()) {
@@ -320,7 +330,17 @@ fn validate_nodes(
         {
             return Err(format!("Invalid geometry or style for layer {}", node.name));
         }
-        validate_nodes(&node.children, ids)?;
+        if let Some(asset_id) = &node.asset_id {
+            let asset_id = AssetId::from(asset_id.as_str());
+            if !assets.contains(&asset_id) {
+                return Err(format!(
+                    "Layer {} references an asset that is absent from the document: {}",
+                    node.name,
+                    asset_id.as_str()
+                ));
+            }
+        }
+        validate_nodes(&node.children, ids, assets)?;
     }
     Ok(())
 }

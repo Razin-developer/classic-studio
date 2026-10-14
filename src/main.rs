@@ -432,6 +432,7 @@ impl ClassicApp {
                     "woff2", "mp4", "webm", "mov", "mp3", "wav", "ogg", "pdf",
                 ],
             )
+            .add_filter("Any file", &["*"])
             .pick_file()
         else {
             return;
@@ -446,16 +447,19 @@ impl ClassicApp {
             media_type_for_path(&path),
         );
         metadata.byte_len = std::fs::metadata(&path).ok().map(|file| file.len());
-        let record = AssetRecord::new(
-            asset_kind_for_path(&path),
-            metadata,
-            path.to_string_lossy().into_owned(),
-        );
+        let asset_bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.status = format!("Could not read asset: {error}");
+                return;
+            }
+        };
+        let record = AssetRecord::new_embedded(asset_kind_for_path(&path), metadata, asset_bytes);
         let before = self.document.clone();
         match self.document.assets.insert(record) {
             Ok(()) => {
                 self.push_undo_snapshot(before);
-                self.status = "Imported local asset reference".into();
+                self.status = "Embedded asset in this .classic project".into();
             }
             Err(error) => self.status = format!("Could not import asset: {error}"),
         }
@@ -487,7 +491,11 @@ impl ClassicApp {
         if asset.kind != AssetKind::RasterImage {
             return None;
         }
-        let decoded = image::open(&asset.source_uri).ok()?.into_rgba8();
+        let decoded = match asset.embedded_bytes() {
+            Some(bytes) => image::load_from_memory(bytes).ok()?,
+            None => image::open(&asset.source_uri).ok()?,
+        }
+        .into_rgba8();
         let size = [decoded.width() as usize, decoded.height() as usize];
         if size[0] == 0 || size[1] == 0 {
             return None;

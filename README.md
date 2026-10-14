@@ -39,7 +39,7 @@ The release profile enables full optimization and thin LTO.
 - Canvas context menu, arrow-key nudging, zoom-to-pointer, and fit-to-artwork shortcut
 - Alignment and distribution controls for multi-layer selections
 - Canvas ruler-guide menu: add horizontal or vertical guides, toggle visibility/snap behavior, remove unlocked guides, and retain them in `.classic` documents
-- Assets panel: import or drag/drop local image, media, font, and document references; PNG, JPEG, GIF, BMP, and WebP raster assets decode into cached GPU textures for canvas and presentation preview, while linked vectors/media remain retained references
+- Assets panel: import or drag/drop local files and embed their bytes, size, and SHA-256 integrity hash into `.classic` projects; PNG, JPEG, GIF, BMP, and WebP raster assets decode into cached GPU textures for canvas and presentation preview
 - Comments panel: add pinned local review comments to layers or canvas points, resolve/reopen/delete them, and retain them in `.classic` documents
 - Local presentation preview: present fitted prototype frames, execute saved click navigation, restart the flow, and exit with the control or `Escape`
 - Components menu: create local component definitions from selected layers and place linked instances on the active canvas

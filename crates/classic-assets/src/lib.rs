@@ -1,9 +1,9 @@
 //! Local asset catalog primitives for Classic Studio.
 //!
-//! The catalog contains only metadata and stable references. Importing files,
-//! decoding media, thumbnail generation, syncing, and network transfer belong
-//! to higher layers, keeping this crate deterministic and usable in native or
-//! headless Rust applications.
+//! The catalog supports either stable linked references or self-contained,
+//! hash-verified embedded payloads. Importing files, decoding media, thumbnail
+//! generation, syncing, and network transfer belong to higher layers, keeping
+//! this crate deterministic and usable in native or headless Rust applications.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -11,11 +11,16 @@ use std::{
     fmt,
 };
 
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 /// Current persistence schema for [`AssetCatalog`].
 pub const ASSET_CATALOG_SCHEMA_VERSION: u32 = 1;
+
+/// The content-digest format used by [`EmbeddedAssetPayload`].
+pub const EMBEDDED_ASSET_HASH_ALGORITHM: &str = "sha256";
 
 /// A stable catalog-local asset identifier.
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -116,6 +121,100 @@ impl AssetMetadata {
     }
 }
 
+/// Self-contained asset bytes and their integrity metadata.
+///
+/// The serialized `data` field is base64 so a `.classic` JSON document stays
+/// portable. The size and SHA-256 digest are stored beside the bytes and are
+/// verified whenever the containing catalog is validated.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedAssetPayload {
+    #[serde(with = "base64_bytes")]
+    data: Vec<u8>,
+    pub byte_len: u64,
+    pub content_hash: String,
+}
+
+impl EmbeddedAssetPayload {
+    /// Creates a payload with byte length and SHA-256 digest derived from
+    /// `data`. Callers cannot accidentally create inconsistent metadata via
+    /// this constructor.
+    pub fn from_bytes(data: impl Into<Vec<u8>>) -> Self {
+        let data = data.into();
+        let byte_len = data.len() as u64;
+        let content_hash = content_hash(&data);
+        Self {
+            data,
+            byte_len,
+            content_hash,
+        }
+    }
+
+    /// Returns the original unencoded asset bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Returns the declared hashing algorithm for [`Self::content_hash`].
+    pub const fn hash_algorithm(&self) -> &'static str {
+        EMBEDDED_ASSET_HASH_ALGORITHM
+    }
+
+    /// Checks that the persisted byte count and hash describe the embedded
+    /// bytes exactly.
+    pub fn validate(&self) -> Result<(), EmbeddedAssetError> {
+        if self.byte_len != self.data.len() as u64 {
+            return Err(EmbeddedAssetError::ByteLengthMismatch {
+                declared: self.byte_len,
+                actual: self.data.len() as u64,
+            });
+        }
+        if !is_sha256_hex(&self.content_hash) {
+            return Err(EmbeddedAssetError::InvalidContentHash {
+                content_hash: self.content_hash.clone(),
+            });
+        }
+
+        let actual = content_hash(&self.data);
+        if self.content_hash != actual {
+            return Err(EmbeddedAssetError::ContentHashMismatch {
+                declared: self.content_hash.clone(),
+                actual,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Integrity failures for an [`EmbeddedAssetPayload`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EmbeddedAssetError {
+    ByteLengthMismatch { declared: u64, actual: u64 },
+    InvalidContentHash { content_hash: String },
+    ContentHashMismatch { declared: String, actual: String },
+}
+
+impl fmt::Display for EmbeddedAssetError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ByteLengthMismatch { declared, actual } => write!(
+                formatter,
+                "embedded payload length {declared} does not match actual length {actual}"
+            ),
+            Self::InvalidContentHash { content_hash } => write!(
+                formatter,
+                "embedded payload hash is not a lowercase SHA-256 hex digest: {content_hash}"
+            ),
+            Self::ContentHashMismatch { declared, actual } => write!(
+                formatter,
+                "embedded payload hash {declared} does not match computed SHA-256 {actual}"
+            ),
+        }
+    }
+}
+
+impl Error for EmbeddedAssetError {}
+
 /// A stable asset reference. The URI is opaque to this crate and may address
 /// an app-owned cache, embedded document blob, or another local source.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -124,7 +223,13 @@ pub struct AssetRecord {
     pub id: AssetId,
     pub kind: AssetKind,
     pub metadata: AssetMetadata,
+    /// The original linked location. Embedded records use an `embedded://`
+    /// URI, retaining one stable source-reference field for all asset forms.
     pub source_uri: String,
+    /// Optional self-contained bytes. The field is absent for existing linked
+    /// records, preserving their serialized representation and behavior.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedded_payload: Option<EmbeddedAssetPayload>,
 }
 
 impl AssetRecord {
@@ -134,7 +239,57 @@ impl AssetRecord {
             kind,
             metadata,
             source_uri: source_uri.into(),
+            embedded_payload: None,
         }
+    }
+
+    /// Creates a portable asset record whose bytes are stored in the document.
+    ///
+    /// The metadata size and checksum are synchronized to the payload so UI
+    /// layers can use their existing metadata fields without recomputing them.
+    pub fn new_embedded(
+        kind: AssetKind,
+        mut metadata: AssetMetadata,
+        data: impl Into<Vec<u8>>,
+    ) -> Self {
+        let id = AssetId::new();
+        let embedded_payload = EmbeddedAssetPayload::from_bytes(data);
+        synchronize_metadata_with_payload(&mut metadata, &embedded_payload);
+        Self {
+            source_uri: format!("embedded://{}", id.as_str()),
+            id,
+            kind,
+            metadata,
+            embedded_payload: Some(embedded_payload),
+        }
+    }
+
+    /// Replaces or adds the portable payload and synchronizes the related
+    /// metadata fields.
+    pub fn set_embedded_bytes(&mut self, data: impl Into<Vec<u8>>) {
+        let payload = EmbeddedAssetPayload::from_bytes(data);
+        synchronize_metadata_with_payload(&mut self.metadata, &payload);
+        self.embedded_payload = Some(payload);
+        if !self.source_uri.starts_with("embedded://") {
+            self.source_uri = format!("embedded://{}", self.id.as_str());
+        }
+    }
+
+    /// Drops the stored payload while retaining the source URI for the caller
+    /// to replace with an external location if needed.
+    pub fn clear_embedded_payload(&mut self) -> Option<EmbeddedAssetPayload> {
+        self.embedded_payload.take()
+    }
+
+    /// Gives callers direct read access to a verified-on-save payload.
+    pub fn embedded_bytes(&self) -> Option<&[u8]> {
+        self.embedded_payload
+            .as_ref()
+            .map(EmbeddedAssetPayload::bytes)
+    }
+
+    pub fn is_embedded(&self) -> bool {
+        self.embedded_payload.is_some()
     }
 
     pub fn validate(&self) -> Result<(), AssetCatalogError> {
@@ -142,6 +297,29 @@ impl AssetRecord {
         validate_nonempty("asset name", &self.metadata.name)?;
         validate_nonempty("media type", &self.metadata.media_type)?;
         validate_nonempty("source URI", &self.source_uri)?;
+
+        if let Some(payload) = &self.embedded_payload {
+            payload
+                .validate()
+                .map_err(|source| AssetCatalogError::InvalidEmbeddedPayload {
+                    id: self.id.clone(),
+                    source,
+                })?;
+            if self.metadata.byte_len != Some(payload.byte_len) {
+                return Err(AssetCatalogError::EmbeddedByteLengthMetadataMismatch {
+                    id: self.id.clone(),
+                    metadata: self.metadata.byte_len,
+                    payload: payload.byte_len,
+                });
+            }
+            if self.metadata.checksum.as_deref() != Some(payload.content_hash.as_str()) {
+                return Err(AssetCatalogError::EmbeddedChecksumMetadataMismatch {
+                    id: self.id.clone(),
+                    metadata: self.metadata.checksum.clone(),
+                    payload: payload.content_hash.clone(),
+                });
+            }
+        }
 
         if self.metadata.pixel_size.is_some() && !self.kind.supports_dimensions() {
             return Err(AssetCatalogError::UnsupportedMetadata {
@@ -305,6 +483,20 @@ pub enum AssetCatalogError {
     EmptyTag {
         id: AssetId,
     },
+    InvalidEmbeddedPayload {
+        id: AssetId,
+        source: EmbeddedAssetError,
+    },
+    EmbeddedByteLengthMetadataMismatch {
+        id: AssetId,
+        metadata: Option<u64>,
+        payload: u64,
+    },
+    EmbeddedChecksumMetadataMismatch {
+        id: AssetId,
+        metadata: Option<String>,
+        payload: String,
+    },
 }
 
 impl fmt::Display for AssetCatalogError {
@@ -339,11 +531,75 @@ impl fmt::Display for AssetCatalogError {
             Self::EmptyTag { id } => {
                 write!(formatter, "asset {} contains an empty tag", id.as_str())
             }
+            Self::InvalidEmbeddedPayload { id, source } => {
+                write!(
+                    formatter,
+                    "asset {} has an invalid embedded payload: {source}",
+                    id.as_str()
+                )
+            }
+            Self::EmbeddedByteLengthMetadataMismatch {
+                id,
+                metadata,
+                payload,
+            } => write!(
+                formatter,
+                "asset {} metadata length {metadata:?} does not match embedded payload length {payload}",
+                id.as_str()
+            ),
+            Self::EmbeddedChecksumMetadataMismatch {
+                id,
+                metadata,
+                payload,
+            } => write!(
+                formatter,
+                "asset {} metadata checksum {metadata:?} does not match embedded payload SHA-256 {payload}",
+                id.as_str()
+            ),
         }
     }
 }
 
 impl Error for AssetCatalogError {}
+
+fn synchronize_metadata_with_payload(metadata: &mut AssetMetadata, payload: &EmbeddedAssetPayload) {
+    metadata.byte_len = Some(payload.byte_len);
+    metadata.checksum = Some(payload.content_hash.clone());
+}
+
+fn content_hash(data: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(data))
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
+mod base64_bytes {
+    use super::BASE64_STANDARD;
+    use base64::Engine as _;
+    use serde::{Deserialize, Deserializer, Serializer, de::Error as _};
+
+    pub fn serialize<S>(value: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&BASE64_STANDARD.encode(value))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let encoded = String::deserialize(deserializer)?;
+        BASE64_STANDARD
+            .decode(encoded.as_bytes())
+            .map_err(D::Error::custom)
+    }
+}
 
 fn validate_id(id: &AssetId) -> Result<(), AssetCatalogError> {
     if id.0.trim().is_empty() {

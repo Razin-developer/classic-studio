@@ -10,5 +10,7 @@ name = "classic_assets"
 path = "src/lib.rs"
 
 [dependencies]
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
